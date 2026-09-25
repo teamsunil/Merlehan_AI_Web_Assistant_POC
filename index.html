@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Merlehan Group · AI Enquiry Assistant (POC)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#2B3350; --navy-2:#363F63;
+  --paper:#F2F3F7; --surface:#FFFFFF; --ink:#1E2338; --muted:#5B627C;
+  --line:#DADDE6; --soft:#E8EAF1; --accent:#9A8150; --accent-ink:#6E5A33;
+  --user:#2B3350; --user-ink:#FFFFFF; --ok:#2F6B4F;
+  --serif:"EB Garamond","Garamond","Georgia","Times New Roman",serif;
+  --sans:"Public Sans","Segoe UI","Helvetica Neue",Arial,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#151929; --surface:#1E2337; --ink:#E8EAF2; --muted:#A2A8BF;
+    --line:#333A56; --soft:#272D45; --accent:#C8AE78; --accent-ink:#D8C293;
+    --user:#3A4470; --ok:#7CC3A0;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#151929; --surface:#1E2337; --ink:#E8EAF2; --muted:#A2A8BF;
+  --line:#333A56; --soft:#272D45; --accent:#C8AE78; --accent-ink:#D8C293;
+  --user:#3A4470; --ok:#7CC3A0;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{margin:0;height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+img{max-width:100%}
+
+/* Header */
+.bar{background:var(--navy);color:#fff}
+.bar-in{max-width:1180px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.bar img{height:48px;width:auto;display:block}
+.bar nav{display:flex;gap:22px;font-size:14px}
+.bar nav a{text-decoration:none;opacity:.85}
+.bar nav a:hover{opacity:1;text-decoration:underline;text-underline-offset:4px}
+
+/* Layout */
+.wrap{max-width:1180px;margin:0 auto;padding:36px 20px 48px;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:40px;align-items:start}
+.intro h1{font-family:var(--serif);font-weight:500;font-size:clamp(34px,4.2vw,48px);line-height:1.08;margin:0 0 16px;letter-spacing:-.01em}
+.intro p.lede{font-size:17px;color:var(--muted);margin:0 0 28px;max-width:44ch}
+.steps{list-style:none;margin:0 0 28px;padding:0;counter-reset:s}
+.steps li{counter-increment:s;display:grid;grid-template-columns:34px 1fr;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.steps li:last-child{border-bottom:1px solid var(--line)}
+.steps li::before{content:counter(s);font-family:var(--serif);font-size:24px;line-height:1;color:var(--accent-ink);padding-top:2px}
+.steps b{display:block;font-weight:600;font-size:15px}
+.steps span{font-size:14px;color:var(--muted)}
+.ledger{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;display:none}
+.ledger.show{display:block}
+.ledger h2{font-family:var(--serif);font-weight:500;font-size:21px;margin:0 0 4px}
+.ledger p{margin:0 0 12px;font-size:13px;color:var(--muted)}
+.ledger dl{margin:0;display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;font-size:14px}
+.ledger dt{color:var(--muted)}
+.ledger dd{margin:0}
+.note{font-size:12.5px;color:var(--muted);margin-top:20px;max-width:52ch}
+
+/* Chat card */
+.chat{background:var(--surface);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;height:min(760px,calc(100dvh - 140px));min-height:540px;overflow:hidden}
+.arcbox{padding:18px 22px 10px;border-bottom:1px solid var(--line);background:linear-gradient(var(--surface),var(--surface))}
+.arcbox svg{display:block;width:100%;height:auto}
+.arc-bg{stroke:var(--soft);stroke-width:3;fill:none}
+.arc-fg{stroke:var(--accent);stroke-width:3;fill:none;stroke-linecap:round;transition:stroke-dashoffset .9s cubic-bezier(.4,0,.2,1)}
+.arc-dot{fill:var(--surface);stroke:var(--line);stroke-width:2;transition:fill .4s,stroke .4s}
+.arc-dot.on{fill:var(--accent);stroke:var(--accent)}
+.arc-lbl{font-family:var(--sans);font-size:12px;fill:var(--muted)}
+.arc-lbl.on{fill:var(--ink);font-weight:600}
+.arc-title{font-family:var(--serif);font-size:21px;fill:var(--ink)}
+
+.log{position:relative;flex:1;overflow-y:auto;padding:22px;display:flex;flex-direction:column;gap:16px;scroll-behavior:smooth}
+.log>*{flex-shrink:0}
+.msg{max-width:88%;font-size:15.5px;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.ai{align-self:flex-start;padding-left:14px;border-left:2px solid var(--accent)}
+.msg.user{align-self:flex-end;background:var(--user);color:var(--user-ink);padding:10px 14px;border-radius:14px 14px 4px 14px}
+.msg.think{color:var(--muted);font-style:italic}
+.msg.think::after{content:"";display:inline-block;width:1.2em;text-align:left;animation:dots 1.4s steps(4) infinite}
+@keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+
+.mlinks{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;white-space:normal}
+.mlinks a{font-family:var(--serif);font-size:16.5px;color:var(--accent-ink);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.mlinks a:hover{text-decoration-color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding-left:16px}
+.chip{font:inherit;font-size:13.5px;background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:7px 13px;cursor:pointer;text-align:left}
+.chip:hover{border-color:var(--accent);background:var(--soft)}
+
+/* Recommendation */
+.rec{align-self:stretch;border:1px solid var(--line);border-radius:12px;overflow:hidden;animation:rise .5s ease-out}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.rec-head{background:var(--navy);color:#fff;padding:18px 20px 16px;position:relative;overflow:hidden}
+.rec-head svg{position:absolute;right:-30px;top:-10px;width:220px;opacity:.35}
+.rec-head small{font-size:12.5px;opacity:.8}
+.rec-head h3{font-family:var(--serif);font-weight:500;font-size:28px;line-height:1.1;margin:2px 0 4px}
+.rec-head .also{font-size:13.5px;opacity:.85}
+.rec-body{padding:18px 20px;display:grid;gap:16px}
+.rec-body p{margin:0;font-size:15px}
+.rec-body h4{margin:0 0 6px;font-size:13px;font-weight:600;color:var(--muted)}
+.ins{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.ins a{font-family:var(--serif);font-size:17px;text-decoration:none;border-bottom:1px solid var(--line)}
+.ins a:hover{border-color:var(--accent)}
+.next{background:var(--soft);border-radius:8px;padding:12px 14px;font-size:14.5px}
+.actions{display:flex;flex-wrap:wrap;gap:10px}
+.btn{font:inherit;font-size:14.5px;font-weight:600;border-radius:8px;padding:10px 16px;cursor:pointer;border:1px solid var(--navy);background:var(--navy);color:#fff;text-decoration:none;display:inline-flex;align-items:center}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.form{display:none;gap:10px;border-top:1px solid var(--line);padding-top:14px}
+.form.show{display:grid}
+.form label{font-size:13px;color:var(--muted);display:grid;gap:4px}
+.form input{font:inherit;font-size:15px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+.sent{color:var(--ok);font-weight:600;font-size:14.5px}
+.disc{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding:10px 20px}
+
+/* Composer */
+.composer{border-top:1px solid var(--line);padding:12px 14px;display:flex;gap:10px;align-items:flex-end;background:var(--surface)}
+.composer textarea{flex:1;font:inherit;font-size:15.5px;resize:none;border:1px solid var(--line);border-radius:10px;padding:10px 12px;max-height:140px;min-height:44px;background:var(--paper);color:var(--ink)}
+.composer textarea:focus{outline:none;border-color:var(--accent)}
+.send{height:44px;padding:0 18px}
+.foot{font-size:11.5px;color:var(--muted);padding:0 16px 10px;background:var(--surface)}
+
+@media (max-width:900px){
+  .wrap{grid-template-columns:1fr;padding-top:24px;gap:24px}
+  .steps,.note{display:none}
+  .intro p.lede{margin-bottom:0}
+  .chat{height:calc(100dvh - 100px);min-height:480px}
+  .bar nav a:not(.keep){display:none}
+  .ledger{display:none!important}
+  .arc-lbl{font-size:17px}
+}
+@media (max-width:520px){
+  .bar img{height:40px}
+  .log{padding:16px}
+  .msg{max-width:94%}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="bar-in">
+    <a href="https://merlehangroup.com/" target="_blank" rel="noopener" aria-label="Merlehan Group website"><img src="data:image/png;base64,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" alt="Merlehan Group"></a>
+    <nav>
+      <a href="https://merlehangroup.com/our-insights/" target="_blank" rel="noopener">Insights</a>
+      <a href="https://merlehangroup.com/our-team/" target="_blank" rel="noopener">Our team</a>
+      <a class="keep" href="https://merlehangroup.com/contact/" target="_blank" rel="noopener">Contact us</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="intro">
+    <h1>Tell us what's happening. We'll point you to the right team.</h1>
+    <p class="lede">Describe your matter in your own words. The assistant asks a few questions, then suggests which part of Merlehan Group is best placed to help.</p>
+    <ol class="steps">
+      <li><div><b>Describe your situation</b><span>A dispute, a deal, a project under pressure, or a business decision.</span></div></li>
+      <li><div><b>Answer a few questions</b><span>Industry, location, where things stand and any deadlines.</span></div></li>
+      <li><div><b>Get a suggested pathway</b><span>Strategy, Implementation, Legal or Capital &amp; Infrastructure Projects, with related insights.</span></div></li>
+    </ol>
+    <aside class="ledger" id="ledger" aria-live="polite">
+      <h2>Your enquiry so far</h2>
+      <p>This is what the assistant has understood. It is shared with the team only if you send it.</p>
+      <dl id="ledgerList"></dl>
+    </aside>
+    <p class="note">The assistant gives general information drawn from the Merlehan Group website. It is not legal advice and does not create a client relationship.</p>
+  </section>
+
+  <section class="chat" aria-label="Enquiry assistant">
+    <div class="arcbox">
+      <svg viewBox="0 0 600 100" role="img" aria-label="Assessment progress">
+        <path class="arc-bg" d="M40 76 Q300 -14 560 76" pathLength="100"/>
+        <path class="arc-fg" id="arcFg" d="M40 76 Q300 -14 560 76" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>
+        <circle class="arc-dot on" id="d0" cx="40" cy="76" r="6"/>
+        <circle class="arc-dot" id="d1" cx="300" cy="31" r="6"/>
+        <circle class="arc-dot" id="d2" cx="560" cy="76" r="6"/>
+        <text class="arc-lbl on" id="l0" x="40" y="91" text-anchor="start">Your situation</text>
+        <text class="arc-lbl" id="l1" x="300" y="56" text-anchor="middle">A few details</text>
+        <text class="arc-lbl" id="l2" x="560" y="91" text-anchor="end">Suggested pathway</text>
+      </svg>
+    </div>
+    <div class="log" id="log" aria-live="polite"></div>
+    <form class="composer" id="composer">
+      <label for="input" style="position:absolute;left:-9999px">Describe your situation</label>
+      <textarea id="input" rows="1" placeholder="Describe your situation or ask a question, e.g. A subcontractor's payment claim was served on us last week…"></textarea>
+      <button class="btn send" id="send" type="submit">Send</button>
+    </form>
+    <div class="foot" id="foot">General information only, not legal advice.</div>
+  </section>
+</main>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- Knowledge base: drawn from merlehangroup.com ---------- */
+const SERVICES = {
+  "Strategy": {url:"https://merlehangroup.com/strategy/", blurb:"Analysing the business, recommending changes (including technology advances) and solving problems to make it more successful and sustain its competitive advantage."},
+  "Implementation": {url:"https://merlehangroup.com/implementation/", blurb:"Implementing advice in the business for real impact, negotiating important deals and providing extra in-house commercial bandwidth when needed."},
+  "Legal": {url:"https://merlehangroup.com/legal/", blurb:"Legal advice, documentation and representation tailored to the business strategy to protect interests, get deals done and resolve problems."},
+  "Capital & Infrastructure Projects": {url:"https://merlehangroup.com/major-projects/", blurb:"Helping deliver capital, infrastructure and operational projects on time and to budget through commercial, legal, risk management and project leadership support."}
+};
+const INSIGHTS = [
+  {id:"sop-vic", title:"Construction Industry Security of Payment Legislation – Victoria Amendments", url:"https://merlehangroup.com/construction-industry-security-of-payment-legislation-victoria-amendments/", tags:["payment","claim","security of payment","adjudication","victoria","vic","subcontract","progress","unpaid","construction"]},
+  {id:"sop-ready", title:"Updated Security of Payment legislation ready-reckoner", url:"https://merlehangroup.com/updated-security-of-payment-legislation-ready-reckoner/", tags:["payment","claim","security of payment","adjudication","schedule","subcontract","progress","unpaid","construction","nsw","queensland","qld","wa","sa"]},
+  {id:"land-qld", title:"When the Ground Shifts: the New Law of Land Support in Queensland", url:"https://merlehangroup.com/when-the-ground-shifts-the-new-law-of-land-support-in-queensland/", tags:["land","excavation","neighbour","support","queensland","qld","property","development","subsidence"]},
+  {id:"royal-comm", title:"Navigating Royal Commissions and Commissions of Inquiry in Australia: a strategic guide", url:"https://merlehangroup.com/navigating-royal-commissions-and-commissions-of-inquiry-in-australia-a-strategic-guide/", tags:["royal commission","inquiry","investigation","regulator","summons","hearing","evidence"]},
+  {id:"qbcc-mining", title:"QBCC mining works exemption clarified", url:"https://merlehangroup.com/one-would-not-have-any-gold-one-would-just-have-rock-qbcc-mining-works-exemption-clarified/", tags:["mining","qbcc","licence","license","queensland","qld","resources","mine"]},
+  {id:"uct", title:"Unfair contract terms laws: when repeat use contracts are not ‘standard form’", url:"https://merlehangroup.com/unfair-contract-terms-laws-when-repeat-use-contracts-are-not-standard-form/", tags:["contract","terms","unfair","standard form","template","supplier","customer","small business"]}
+];
+const CONTACT = "https://merlehangroup.com/contact/";
+
+/* ================= CONFIG =================
+   Optional: paste a paid OpenAI API key to switch on live AI answers.
+   Leave empty to run the built-in assistant (works fully offline).
+   Note: a key placed here is visible to anyone who opens the file —
+   use a restricted key for demos and a server-side proxy in production. */
+const OPENAI_API_KEY = "";
+const OPENAI_MODEL   = "gpt-4o-mini";
+/* ========================================== */
+
+const L = {
+  strategy:{t:"Strategy",u:"https://merlehangroup.com/strategy/"},
+  impl:{t:"Implementation",u:"https://merlehangroup.com/implementation/"},
+  legal:{t:"Legal",u:"https://merlehangroup.com/legal/"},
+  projects:{t:"Capital & Infrastructure Projects",u:"https://merlehangroup.com/major-projects/"},
+  about:{t:"About us",u:"https://merlehangroup.com/about-2/"},
+  values:{t:"Our values",u:"https://merlehangroup.com/our-values/"},
+  team:{t:"Our team",u:"https://merlehangroup.com/our-team/"},
+  insights:{t:"Our insights",u:"https://merlehangroup.com/our-insights/"},
+  join:{t:"Join us",u:"https://merlehangroup.com/join-us/"},
+  contact:{t:"Contact us",u:CONTACT}
+};
+const ins = id => { const i=INSIGHTS.find(x=>x.id===id); return {t:i.title,u:i.url}; };
+const FAQ = [
+  {k:["what do you do","what does merlehan","services","who are you","about merlehan","what is merlehan","tell me about merlehan","what kind of firm","offer","help with","areas"],
+   a:"Merlehan Group is an Australian multidisciplinary strategy, implementation, legal and projects firm that helps businesses succeed and keep their competitive advantage. It works across four areas:\n\n• Strategy: analysing the business, recommending changes (including technology) and solving problems.\n• Implementation: putting advice into practice, negotiating important deals and adding in-house commercial bandwidth.\n• Legal: advice, documentation and representation tailored to your business strategy.\n• Capital & Infrastructure Projects: commercial, legal, risk and project leadership support to deliver projects on time and to budget.",
+   links:[L.strategy,L.impl,L.legal,L.projects]},
+  {k:["strategy service","strategy team","what is strategy","business strategy","strategic advice"], a:"The Strategy team analyses your business, recommends changes (including technology advances) and solves problems to make you more successful and sustain your competitive advantage.", links:[L.strategy]},
+  {k:["implementation","negotiate","negotiation","in-house","bandwidth"], a:"The Implementation team puts advice into practice in your business for real impact, negotiates your important deals and provides extra in-house commercial bandwidth when you need it.", links:[L.impl]},
+  {k:["legal service","legal team","lawyer","lawyers","law firm","legal advice from","representation","litigation"], a:"Merlehan Group's Legal team provides legal advice, documentation and representation tailored to your business strategy, to protect your interests, get deals done and resolve problems.", links:[L.legal]},
+  {k:["project","infrastructure","capital works","major projects"], a:"The Capital & Infrastructure Projects team helps you deliver important capital, infrastructure and operational projects on time and to budget, through collaborative commercial, legal, risk management and project leadership support.", links:[L.projects]},
+  {k:["security of payment","sop","payment claim","adjudication","progress payment","payment schedule"], a:"Security of payment legislation gives those who carry out construction work, or supply related goods and services, a statutory process to claim progress payments, including adjudication of disputed claims. Each state and territory has its own legislation and timeframes are strict, so it's worth getting advice early.\n\nMerlehan Group has published insights on this topic:", links:[ins("sop-ready"),ins("sop-vic")]},
+  {k:["unfair contract","standard form","contract terms"], a:"Australia's unfair contract terms laws can affect standard form contracts. Merlehan Group has published an insight on when repeat-use contracts are not treated as 'standard form':", links:[ins("uct")]},
+  {k:["royal commission","commission of inquiry","inquiry"], a:"Merlehan Group has published a strategic guide to navigating Royal Commissions and Commissions of Inquiry in Australia:", links:[ins("royal-comm")]},
+  {k:["land support","excavation","neighbour","subsidence"], a:"Merlehan Group has written about the new law of land support in Queensland:", links:[ins("land-qld")]},
+  {k:["qbcc","mining"], a:"Merlehan Group has published an insight clarifying the QBCC mining works exemption in Queensland:", links:[ins("qbcc-mining")]},
+  {k:["insight","article","blog","news","newsletter","subscribe","publication","latest"], a:"Merlehan Group publishes regular insights, recently covering Security of Payment amendments in Victoria, land support law in Queensland, Royal Commissions, the QBCC mining works exemption and unfair contract terms. You can join the insights distribution list through 'Stay Informed' on the website.", links:[L.insights]},
+  {k:["team","who works","people","partner","staff","director","founder"], a:"You can meet the Merlehan Group team and their areas of focus on the Our Team page.", links:[L.team]},
+  {k:["contact","phone","email","call you","reach","address","office","located","location","where are you","speak to someone","talk to"], a:"The Contact Us page has Merlehan Group's current contact details. You can also send your enquiry straight to the team from here once we've worked out the right pathway.", links:[L.contact]},
+  {k:["fee","cost","price","pricing","charge","how much","rates","quote"], a:"Fees depend on the scope of each matter, so they're discussed directly with the team. Describe your situation here and send the enquiry, and the team can talk you through it.", links:[L.contact]},
+  {k:["job","career","join","hiring","vacanc","work for"], a:"Details about working at Merlehan Group are on the Join Us page.", links:[L.join]},
+  {k:["value","culture"], a:"Merlehan Group's values are set out on the Our Values page.", links:[L.values]},
+  {k:["industr","sector","clients"], a:"Merlehan Group's services support businesses broadly, and its published insights focus strongly on construction, infrastructure, property and mining.", links:[L.insights,L.about]},
+  {k:["legal advice","is this advice","can i rely","confidential"], a:"This assistant gives general information drawn from the Merlehan Group website. It isn't legal advice and doesn't create a client relationship. For advice on your circumstances, please speak with the team.", links:[L.contact]},
+  {k:["how does this work","what can you do","how do you work","what is this"], a:"Tell me about your situation in a sentence or two. I'll ask up to three short questions, then suggest which Merlehan Group team is best placed to help, with related insights. You can then send the summary to the team.", links:[]}
+];
+const GREET=/^(hi|hello|hey|g'?day|good (morning|afternoon|evening))\b/i, THANKS=/^(thanks|thank you|cheers|ta)\b/i;
+function isQuestion(t){ return /\?\s*$/.test(t) || /^(what|who|how|where|when|why|which|do|does|can|could|is|are|will|would|should|tell me|explain)\b/i.test(t.trim()); }
+function matchFaq(t){
+  const x=" "+t.toLowerCase()+" "; let best=null, sc=0;
+  FAQ.forEach(f=>{ const s=f.k.reduce((a,k)=>a+(k.length<=3?(new RegExp("\\b"+k+"\\b").test(x)?k.length:0):(x.includes(k)?k.length:0)),0); if(s>sc){sc=s;best=f;} });
+  return best;
+}
+
+/* ---------- State ---------- */
+const S = { turns:[], enquiry:{}, asked:0, done:false, busy:false, mode:(OPENAI_API_KEY?"openai":"demo"), sample:null };
+const $ = id => document.getElementById(id);
+const log = $("log"), input = $("input"), sendBtn = $("send");
+
+/* ---------- UI helpers ---------- */
+function el(tag, cls, text){ const e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
+function scroll(){ log.scrollTop = log.scrollHeight; }
+function addMsg(role, text, links){ const m=el("div","msg "+role,text);
+  if(links&&links.length){ const w=el("div","mlinks"); links.forEach(l=>{ const a=el("a",null,l.t); a.href=l.u; a.target="_blank"; a.rel="noopener"; w.appendChild(a); }); m.appendChild(w); }
+  log.appendChild(m); scroll(); return m; }
+function setProgress(p){
+  p=Math.max(0,Math.min(100,p|0));
+  $("arcFg").setAttribute("stroke-dashoffset", String(100-p));
+  const st = p>=100?2:p>=34?1:0;
+  for(let i=0;i<3;i++){ $("d"+i).classList.toggle("on",i<=st); $("l"+i).classList.toggle("on",i===st); }
+}
+const LEDGER_LABELS = {issue:"Matter",industry:"Industry",role:"Your role",location:"State / territory",timing:"Stage & timing"};
+function renderLedger(){
+  const dl=$("ledgerList"); dl.textContent="";
+  let n=0;
+  for(const k of Object.keys(LEDGER_LABELS)){
+    const v=(S.enquiry[k]||"").trim(); if(!v) continue; n++;
+    dl.appendChild(el("dt",null,LEDGER_LABELS[k])); dl.appendChild(el("dd",null,v));
+  }
+  $("ledger").classList.toggle("show", n>0);
+}
+function setBusy(b){ S.busy=b; sendBtn.disabled=b; input.disabled=b; if(!b) input.focus(); }
+
+function welcome(){
+  addMsg("ai","Hello. I can help you work out which Merlehan Group team is best placed to assist, and answer questions about the firm.\n\nIn a sentence or two, what's going on?");
+  const c=el("div","chips");
+  ["We've received a payment claim on a construction project",
+   "A major infrastructure project is running over budget",
+   "We need help negotiating a significant commercial deal",
+   "Our business needs a strategy review",
+   "We've been asked to appear at a commission of inquiry"].forEach(t=>{
+    const b=el("button","chip",t); b.type="button";
+    b.onclick=()=>{ c.remove(); submit(t); };
+    c.appendChild(b);
+  });
+  log.appendChild(c);
+}
+
+/* ---------- Recommendation card ---------- */
+function renderRec(rec){
+  const svc = SERVICES[rec.service] ? rec.service : "Legal";
+  const card=el("div","rec");
+  const head=el("div","rec-head");
+  head.innerHTML='<svg viewBox="0 0 220 80" aria-hidden="true"><path d="M5 75 Q110 -15 215 75" stroke="#fff" stroke-width="2" fill="none"/></svg>';
+  head.appendChild(el("small",null,"Suggested pathway"));
+  head.appendChild(el("h3",null,svc));
+  if(rec.also && SERVICES[rec.also] && rec.also!==svc) head.appendChild(el("div","also","With support from "+rec.also));
+  card.appendChild(head);
+
+  const body=el("div","rec-body");
+  if(rec.why) body.appendChild(el("p",null,rec.why));
+  const ids=(rec.insights||[]).filter(i=>INSIGHTS.some(x=>x.id===i)).slice(0,3);
+  if(ids.length){
+    const w=el("div"); w.appendChild(el("h4",null,"Related insights from Merlehan Group"));
+    const ul=el("ul","ins");
+    ids.forEach(id=>{ const it=INSIGHTS.find(x=>x.id===id); const li=el("li"); const a=el("a",null,it.title); a.href=it.url; a.target="_blank"; a.rel="noopener"; li.appendChild(a); ul.appendChild(li); });
+    w.appendChild(ul); body.appendChild(w);
+  }
+  if(rec.next_step){ const n=el("div","next"); n.appendChild(el("b",null,"Suggested next step: ")); n.appendChild(document.createTextNode(rec.next_step)); body.appendChild(n); }
+
+  const acts=el("div","actions");
+  const sendE=el("button","btn","Send this enquiry to the team"); sendE.type="button";
+  const learn=el("a","btn ghost","About "+svc); learn.href=SERVICES[svc].url; learn.target="_blank"; learn.rel="noopener";
+  const restart=el("button","btn ghost","Start again"); restart.type="button"; restart.onclick=reset;
+  acts.append(sendE,learn,restart); body.appendChild(acts);
+
+  const form=el("form","form");
+  form.innerHTML='<label>Full name<input name="n" required autocomplete="name"></label><label>Work email<input name="e" type="email" required autocomplete="email"></label><label>Phone (optional)<input name="p" type="tel" autocomplete="tel"></label>';
+  const fb=el("button","btn","Send enquiry"); fb.type="submit"; form.appendChild(fb);
+  sendE.onclick=()=>{ form.classList.add("show"); sendE.disabled=true; form.querySelector("input").focus(); };
+  form.onsubmit=(e)=>{ e.preventDefault(); const name=form.n.value.trim();
+    form.replaceWith(el("p","sent","Enquiry sent. Thanks"+(name?", "+name.split(" ")[0]:"")+" — a member of the "+svc+" team will be in touch. (POC: in the live version this would email the team with the summary on the left.)")); };
+  body.appendChild(form);
+  card.appendChild(body);
+  card.appendChild(el("div","disc","This is general information based on Merlehan Group's published material, not legal advice. For advice on your circumstances, speak with the team."));
+  log.appendChild(card); requestAnimationFrame(()=>{ log.scrollTop=card.offsetTop-12; });
+}
+
+/* ---------- AI engine (Claude sample capability) ---------- */
+function kbText(){
+  let t="SERVICES:\n"; for(const k in SERVICES) t+="- "+k+": "+SERVICES[k].blurb+"\n";
+  t+="\nINSIGHT ARTICLES (id | title):\n"; INSIGHTS.forEach(i=>t+="- "+i.id+" | "+i.title+"\n");
+  t+="\nFAQ FACTS:\n"; FAQ.forEach(f=>t+="- "+f.a.replace(/\n+/g," ")+"\n");
+  t+="\nPAGES: Team "+L.team.u+" | Contact "+L.contact.u+" | Insights "+L.insights.u+" | Join us "+L.join.u+"\n";
+  return t;
+}
+async function aiTurn(){
+  const transcript = S.turns.map(t=>(t.role==="user"?"Visitor: ":"Assistant: ")+t.content).join("\n");
+  const prompt =
+`You are the AI Enquiry Assistant on the website of Merlehan Group, an Australian multidisciplinary strategy, implementation, legal and capital & infrastructure projects firm. Your job is to understand a website visitor's situation and suggest which Merlehan Group service is the best fit.
+
+Use ONLY this knowledge base from the Merlehan Group website. Do not invent services, people, fees or articles.
+${kbText()}
+RULES
+- Ask ONE short follow-up question at a time. Cover, where relevant: industry and the visitor's role (e.g. head contractor, subcontractor, principal, business owner), Australian state/territory, where things stand now and any deadlines.
+- After at most 3 follow-up questions (fewer if you already have enough), give the recommendation.
+- Never give legal advice, predict outcomes, quote legislation deadlines or say what the visitor should do legally. If there appears to be a statutory or court deadline, say timing may matter and suggest contacting the team promptly.
+- If the visitor asks a question about Merlehan Group, its services, team, contact, fees or insights, answer it briefly using only the knowledge base (if the answer isn't there, say so and point to the Contact page), then continue the assessment if it has started. Do not count that as a follow-up question.
+- If the visitor is off-topic, politely steer back. Australian English. Warm, professional, concise (under 60 words per message).
+- Already asked follow-up questions: ${S.asked}.
+
+CONVERSATION SO FAR
+${transcript}
+
+Respond with ONLY a JSON object, no markdown:
+{"message": string (what to say to the visitor now; when recommending, a one-sentence lead-in),
+ "done": boolean (true when giving the recommendation),
+ "progress": number 0-100 (how complete the assessment is; 100 when done),
+ "enquiry": {"issue": string, "industry": string, "role": string, "location": string, "timing": string} (short phrases, "" if unknown),
+ "recommendation": null or {"service": one of ${JSON.stringify(Object.keys(SERVICES))}, "also": one of those names or "", "why": string (2-3 sentences tying their situation to the service), "insights": array of up to 3 insight ids that are genuinely relevant (may be empty), "next_step": string}}`;
+  if(S.mode==="ai") return await S.sample.json(prompt,{modelTier:"quick",cache:false});
+  const r=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",
+    headers:{"Content-Type":"application/json","Authorization":"Bearer "+OPENAI_API_KEY},
+    body:JSON.stringify({model:OPENAI_MODEL,temperature:0.3,response_format:{type:"json_object"},messages:[{role:"system",content:prompt}]})});
+  if(!r.ok) throw new Error("OpenAI "+r.status);
+  const d=await r.json(); return JSON.parse(d.choices[0].message.content);
+}
+
+/* ---------- Demo engine (works without an AI connection) ---------- */
+const RULES = [
+  {svc:"Legal", also:"Capital & Infrastructure Projects", kw:["payment claim","payment schedule","adjudicat","security of payment","progress claim","unpaid","subcontract","variation","defect"], label:"Construction payment or contract dispute"},
+  {svc:"Legal", also:"Strategy", kw:["royal commission","inquiry","commission","regulator","summons","investigation"], label:"Inquiry or regulatory investigation"},
+  {svc:"Legal", also:"Implementation", kw:["unfair","contract term","standard form","terms and conditions","litigation","court","sue","lawsuit","dispute","breach"], label:"Contract or commercial dispute"},
+  {svc:"Capital & Infrastructure Projects", also:"Legal", kw:["infrastructure","project","over budget","delay","behind schedule","tender","procurement","contractor","construction","mine","mining","capital"], label:"Capital or infrastructure project"},
+  {svc:"Implementation", also:"Legal", kw:["negotiat","deal","acquisition","merger","joint venture","partnership","in-house","bandwidth","rollout","transformation","implement"], label:"Deal negotiation or implementation"},
+  {svc:"Strategy", also:"Implementation", kw:["strategy","growth","competitive","market","restructur","technology","digital","review","plan","expand","performance"], label:"Business strategy"}
+];
+const STATES = {"new south wales":"NSW","nsw":"NSW","victoria":"VIC","vic":"VIC","queensland":"QLD","qld":"QLD","western australia":"WA","wa":"WA","south australia":"SA","sa":"SA","tasmania":"TAS","tas":"TAS","act":"ACT","canberra":"ACT","northern territory":"NT","nt":"NT","sydney":"NSW","melbourne":"VIC","brisbane":"QLD","perth":"WA","adelaide":"SA","hobart":"TAS","darwin":"NT"};
+const QUESTIONS = [
+  "Thanks. Which industry is your business in, and what's your role in this — for example head contractor, subcontractor, project owner or business owner?",
+  "Which state or territory is this in?",
+  "Where do things stand right now, and are there any deadlines or dates coming up?"
+];
+function classify(text){
+  const t=text.toLowerCase(); let best=null, score=0;
+  RULES.forEach(r=>{ const s=r.kw.reduce((a,k)=>a+(t.includes(k)?1:0),0); if(s>score){score=s;best=r;} });
+  return best || RULES[RULES.length-1];
+}
+function pickInsights(text){
+  const t=" "+text.toLowerCase()+" ";
+  return INSIGHTS.map(i=>({id:i.id,s:i.tags.reduce((a,k)=>a+(k.length<=3?(new RegExp("\\b"+k+"\\b").test(t)?1:0):(t.includes(k)?1:0)),0)}))
+    .filter(x=>x.s>=2).sort((a,b)=>b.s-a.s).slice(0,3).map(x=>x.id);
+}
+function findState(text){
+  const t=" "+text.toLowerCase().replace(/[^a-z ]/g," ")+" ";
+  for(const k in STATES){ if(t.includes(" "+k+" ")) return STATES[k]; } return "";
+}
+function demoTurn(userText){
+  const all=S.turns.filter(t=>t.role==="user").map(t=>t.content).join(" ");
+  const e=S.enquiry, step=S.asked;
+  if(step===0){ e.issue=classify(userText).label; }
+  if(step===1){ e.industry=userText.slice(0,80); const m=userText.toLowerCase().match(/(head contractor|subcontractor|principal|owner|developer|supplier|consultant|director|ceo|manager)/); if(m) e.role=m[1].replace(/^./,c=>c.toUpperCase()); }
+  const st=findState(userText); if(st) e.location=st;
+  if(step===3){ e.timing=userText.slice(0,80); }
+  if(step<3){
+    let q=step;
+    if(q===1 && e.location) q=2;
+    S.asked=q+1;
+    return {message:QUESTIONS[q], done:false, progress:[20,45,70][q], enquiry:e};
+  }
+  const r=classify(all);
+  const urgent=/(day|week|deadline|urgent|asap|court|hearing|served|adjudicat)/i.test(all);
+  const reasons={
+    "Legal":"Your matter involves legal rights and obligations that need tailored advice, documentation or representation. The Legal team works alongside the business strategy so the response protects your position and keeps the commercial outcome in view.",
+    "Capital & Infrastructure Projects":"Your situation centres on delivering a significant project. The Projects team provides commercial, legal, risk management and project leadership support to help bring projects in on time and to budget.",
+    "Implementation":"You need hands-on support to get something done, not just advice. The Implementation team negotiates important deals and provides extra in-house commercial bandwidth when you need it.",
+    "Strategy":"You're looking at the direction and competitiveness of the business. The Strategy team analyses the business, recommends changes, including technology advances, and solves problems to sustain your competitive advantage."
+  };
+  return {message:"Thanks, that gives a clear picture. Here's where I'd suggest starting.", done:true, progress:100, enquiry:e,
+    recommendation:{service:r.svc, also:r.also, why:reasons[r.svc], insights:pickInsights(all).filter(id=>!(id==="sop-vic"&&e.location&&e.location!=="VIC")&&!((id==="land-qld"||id==="qbcc-mining")&&e.location&&e.location!=="QLD")),
+      next_step: urgent ? "Timing may matter here. Contact the team promptly with any documents you've received or sent." : "Send your enquiry to the team with a short summary and any key documents so they can arrange an initial conversation."}};
+}
+
+/* ---------- Turn handling ---------- */
+function localTurn(text){
+  const q=isQuestion(text), started=S.asked>0;
+  const pending = started && S.asked<=3 ? "\n\n" + QUESTIONS[S.asked-1] : "";
+  if(GREET.test(text) && text.length<30) return {message:"Hello! In a sentence or two, what's going on in your business? Or ask me anything about Merlehan Group."+pending, faq:true};
+  if(THANKS.test(text) && text.length<30) return {message:"You're welcome. Is there anything else you'd like to know?", faq:true};
+  const f = q ? matchFaq(text) : null;
+  if(f) return {message:f.a+(pending|| (S.done?"":"\n\nIf you'd like, tell me a little about your situation and I'll suggest the right team.")), links:f.links, faq:true};
+  if(q && (!started || S.done)) return {message:"I don't have that detail from the Merlehan Group website, but the team can answer it directly."+(S.done?"":"\n\nOr tell me about your situation and I'll suggest the right team."), links:[L.contact], faq:true};
+  if(S.done) return {message:"Your suggested pathway is above. Choose 'Start again' to look at a different matter, or ask me a question about Merlehan Group.", faq:true};
+  return demoTurn(text);
+}
+async function submit(text){
+  text=text.trim(); if(!text||S.busy) return;
+  document.querySelectorAll(".chips").forEach(c=>c.remove());
+  addMsg("user",text); S.turns.push({role:"user",content:text});
+  input.value=""; autosize(); setBusy(true);
+  const think=addMsg("ai think","Considering your question");
+  let res=null;
+  const live = S.mode==="ai" || (S.mode==="openai");
+  if(live && !S.done){
+    try{ res=await aiTurn(); if(!res || typeof res.message!=="string") res=null; }
+    catch(e){
+      if(e&&e.code==="not_granted"||String(e&&e.message).includes("OpenAI 401")){ S.mode="demo"; }
+      res=null;
+    }
+    if(res && !res.done && !res.faq) S.asked++;
+  } else { await new Promise(r=>setTimeout(r,550)); }
+  if(!res) res=localTurn(text);
+  think.remove();
+  if(res.enquiry && typeof res.enquiry==="object"){ for(const k in LEDGER_LABELS){ if(typeof res.enquiry[k]==="string" && res.enquiry[k].trim()) S.enquiry[k]=res.enquiry[k].trim(); } }
+  renderLedger();
+  addMsg("ai",res.message,res.links); S.turns.push({role:"assistant",content:res.message});
+  if(!res.faq) setProgress(res.done?100:(typeof res.progress==="number"?Math.min(res.progress,90):30));
+  if(res.done && res.recommendation){ S.done=true; renderRec(res.recommendation); input.placeholder="Ask a question about Merlehan Group"; }
+  setBusy(false);
+}
+function reset(){
+  S.turns=[]; S.enquiry={}; S.asked=0; S.done=false;
+  log.textContent=""; renderLedger(); setProgress(0);
+  input.placeholder="Describe your situation or ask a question, e.g. A subcontractor's payment claim was served on us last week…";
+  setBusy(false); welcome();
+}
+function autosize(){ input.style.height="auto"; input.style.height=Math.min(input.scrollHeight,140)+"px"; }
+input.addEventListener("input",autosize);
+input.addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); submit(input.value); }});
+$("composer").addEventListener("submit",e=>{ e.preventDefault(); submit(input.value); });
+
+setProgress(0); welcome();
+
+/* Light up live AI when running inside Claude */
+if(window.claude && typeof window.claude.use==="function"){
+  window.claude.use("sample").then(s=>{ if(s && S.mode!=="openai"){ S.sample=s; S.mode="ai"; } }).catch(()=>{});
+}
+})();
+</script>
+</body>
+</html>
